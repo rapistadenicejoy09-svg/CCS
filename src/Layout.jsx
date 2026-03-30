@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
 import { getAllowedModules } from './lib/security'
 
 const ALL_MODULES = [
-  { id: 'student-profile', code: '1.1', title: 'Student Profile', path: '/student-profile' },
+  { id: 'student-profile', code: '1.1', title: 'Student List', path: '/student-profile' },
   { id: 'faculty-profile', code: '1.2', title: 'Faculty Profile', path: '/faculty-profile' },
   { id: 'events', code: '1.3', title: 'Events', path: '/events' },
   { id: 'scheduling', code: '1.4', title: 'Scheduling', path: '/scheduling' },
@@ -12,9 +12,10 @@ const ALL_MODULES = [
 ]
 
 export default function Layout() {
-  const modules = getAllowedModules(ALL_MODULES)
+  const [modules, setModules] = useState([])
   const [theme, setTheme] = useState('light')
   const [userLabel, setUserLabel] = useState('')
+  const [headerRoleLabel, setHeaderRoleLabel] = useState('')
   const [profilePath, setProfilePath] = useState(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const navigate = useNavigate()
@@ -50,27 +51,41 @@ export default function Layout() {
   useEffect(() => {
     document.body.dataset.theme = theme
     let label = ''
+    let role = null
 
     let path = null
     try {
       const raw = localStorage.getItem('authUser')
       const parsed = raw ? JSON.parse(raw) : null
+      role = parsed?.role || null
       if (parsed?.role === 'admin') {
         label = `Admin: ${parsed.fullName || parsed.identifier || ''}`.trim()
         path = '/admin-profile'
+        setHeaderRoleLabel('Admin')
       } else if (parsed?.role === 'student') {
-        label = `Student: ${parsed.identifier || ''}`.trim()
+        label = `Student: ${parsed.studentId || parsed.identifier || ''}`.trim()
         path = '/student-profile'
+        setHeaderRoleLabel('Student')
       } else if (parsed?.role === 'faculty') {
         label = `Faculty: ${parsed.identifier || ''}`.trim()
         path = '/faculty-my-profile'
+        setHeaderRoleLabel('Faculty')
+      } else {
+        setHeaderRoleLabel('')
       }
     } catch {
-      // ignore
+      setHeaderRoleLabel('')
     }
 
     setUserLabel(label)
     setProfilePath(path)
+    const roleAwareModules = ALL_MODULES.map((m) => {
+      if (m.id === 'student-profile') {
+        return { ...m, title: role === 'admin' ? 'Student List' : 'Student Profile' }
+      }
+      return m
+    })
+    setModules(getAllowedModules(roleAwareModules))
   }, [theme])
 
   return (
@@ -140,9 +155,12 @@ export default function Layout() {
       <main className="main">
         <div className="main-top-bar">
           <div className="top-bar-user-info">
-             <span className="top-bar-name">{userLabel ? userLabel.split(':')[1]?.trim() || userLabel : 'USER'}</span>
-             {userLabel && userLabel.includes(':') && <span className="top-bar-id">{userLabel.split(':')[0]}</span>}
-             <span className="top-bar-status badge-enrolled">ACTIVE</span>
+            <span className="top-bar-name">
+              {userLabel ? userLabel.split(':')[1]?.trim() || userLabel : 'USER'}
+            </span>
+            {headerRoleLabel ? (
+              <span className="top-bar-role badge-enrolled">{headerRoleLabel}</span>
+            ) : null}
           </div>
           <div className="top-bar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
@@ -232,9 +250,19 @@ export default function Layout() {
               <button 
                 className="btn btn-primary btn-logout-confirm" 
                 onClick={() => {
+                  let loginPath = '/admin/login'
+                  try {
+                    const raw = localStorage.getItem('authUser')
+                    const u = raw ? JSON.parse(raw) : null
+                    if (u?.role === 'student') loginPath = '/student/login'
+                    else if (u?.role === 'faculty') loginPath = '/faculty/login'
+                    else if (u?.role === 'admin') loginPath = '/admin/login'
+                  } catch {
+                    // keep default
+                  }
                   localStorage.removeItem('authToken')
                   localStorage.removeItem('authUser')
-                  navigate('/')
+                  navigate(loginPath, { replace: true })
                 }}
               >
                 Log out

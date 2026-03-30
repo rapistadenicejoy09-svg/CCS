@@ -48,5 +48,61 @@ export function initDb(db) {
   } catch (e) {
     // Ignore if column already exists
   }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN class_section TEXT;`);
+  } catch (e) {
+    // ignore
+  }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN student_type TEXT DEFAULT 'regular';`);
+  } catch (e) {
+    // ignore
+  }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
+  } catch (e) {
+    // ignore
+  }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN student_id TEXT;`);
+  } catch (e) {
+    // ignore
+  }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN email TEXT;`);
+  } catch (e) {
+    // ignore
+  }
+
+  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (key TEXT PRIMARY KEY)`)
+  const migrated = db.prepare(`SELECT 1 FROM schema_migrations WHERE key = ?`).get('student_id_email_v1')
+  if (!migrated) {
+    migrateLegacyStudentIdentifier(db)
+    db.prepare(`INSERT INTO schema_migrations (key) VALUES (?)`).run('student_id_email_v1')
+  }
+}
+
+/**
+ * Split legacy student rows where `identifier` held either a student ID or an email.
+ * New logins for migrated email-only rows: use email; student_id is shown as STU-{id} until edited in DB.
+ */
+function migrateLegacyStudentIdentifier(db) {
+  const hasCol = db.prepare(`PRAGMA table_info(users)`).all().some((c) => c.name === 'student_id')
+  if (!hasCol) return
+
+  const students = db.prepare(`SELECT id, identifier FROM users WHERE role = 'student'`).all()
+  for (const row of students) {
+    const raw = String(row.identifier || '').trim()
+    const lower = raw.toLowerCase()
+    if (lower.includes('@')) {
+      const newIdent = `stu-${row.id}`
+      const normIdent = newIdent.toLowerCase().replace(/\s+/g, '')
+      db.prepare(
+        `UPDATE users SET email = ?, student_id = ?, identifier = ? WHERE id = ?`,
+      ).run(lower, `STU-${row.id}`, normIdent, row.id)
+    } else {
+      db.prepare(`UPDATE users SET student_id = ?, email = NULL WHERE id = ?`).run(raw, row.id)
+    }
+  }
 }
 

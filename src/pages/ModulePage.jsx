@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
 const MODULES = {
   'student-profile': {
     code: '1.1',
-    title: 'Student Profile',
-    description: 'View and manage comprehensive student records.',
+    title: 'Student List',
+    description: 'Create and manage student login accounts.',
   },
   'faculty-profile': {
     code: '1.2',
@@ -60,6 +60,7 @@ export default function ModulePage() {
   const { pathname } = useLocation()
   const moduleId = pathname.slice(1).split('/')[0] || null
   const [search, setSearch] = useState('')
+  const [role, setRole] = useState(null)
   const module = moduleId ? MODULES[moduleId] : null
   const items = MOCK_DATA[moduleId] ?? []
 
@@ -71,6 +72,23 @@ export default function ModulePage() {
         i.name.toLowerCase().includes(q) || i.meta.toLowerCase().includes(q)
     )
   }, [items, search])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('authUser')
+      const user = raw ? JSON.parse(raw) : null
+      setRole(user?.role || null)
+    } catch {
+      setRole(null)
+    }
+  }, [])
+
+  const moduleLabel =
+    moduleId === 'student-profile' && role !== 'admin' ? 'Student Profile' : module?.title
+  const moduleDescription =
+    moduleId === 'student-profile' && role !== 'admin'
+      ? 'View and manage comprehensive student records.'
+      : module?.description
 
   if (!module) {
     return (
@@ -85,16 +103,16 @@ export default function ModulePage() {
       <header className="module-header">
         <div>
           <h1 className="main-title">
-            {module.code} {module.title}
+            {module.code} {moduleLabel}
           </h1>
-          <p className="main-description">{module.description}</p>
+          <p className="main-description">{moduleDescription}</p>
         </div>
         <div className="header-actions">
           <div className="search-section">
             <input
               className="search-input"
               type="text"
-              placeholder={`Search ${module.title}…`}
+              placeholder={`Search ${moduleLabel}…`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

@@ -3,12 +3,13 @@ import Layout from './Layout'
 import Dashboard from './pages/Dashboard'
 import ModulePage from './pages/ModulePage'
 import AdminProfile from './pages/AdminProfile'
-import StudentProfile from './pages/StudentProfile'
+import StudentProfileRoute from './pages/StudentProfileRoute'
+import AdminCreateStudent from './pages/AdminCreateStudent'
+import AdminStudentView from './pages/AdminStudentView'
 import FacultyProfile from './pages/FacultyProfile'
 import AdminLogin from './pages/AdminLogin'
 import AdminCreateAccount from './pages/AdminCreateAccount'
 import StudentLogin from './pages/StudentLogin'
-import StudentRegister from './pages/StudentRegister'
 import FacultyLogin from './pages/FacultyLogin'
 import FacultyRegister from './pages/FacultyRegister'
 import { canAccessPath } from './lib/security'
@@ -37,7 +38,7 @@ export default function App() {
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/create-account" element={<AdminCreateAccount />} />
         <Route path="/student/login" element={<StudentLogin />} />
-        <Route path="/student/register" element={<StudentRegister />} />
+        <Route path="/student/register" element={<Navigate to="/student/login" replace />} />
         <Route path="/faculty/login" element={<FacultyLogin />} />
         <Route path="/faculty/register" element={<FacultyRegister />} />
         <Route element={<RequireAuth />}>
@@ -45,7 +46,9 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="admin-profile" element={<AdminProfile />} />
-            <Route path="student-profile" element={<StudentProfile />} />
+            <Route path="student-profile" element={<StudentProfileRoute />} />
+            <Route path="admin/create-student" element={<AdminCreateStudent />} />
+            <Route path="admin/student/:id" element={<AdminStudentView />} />
             <Route path="faculty-my-profile" element={<FacultyProfile />} />
             <Route path="faculty-profile" element={<ModulePage />} />
             <Route path="events" element={<ModulePage />} />

@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
 const MODULES = [
-  { id: 'student-profile', code: '1.1', title: 'Student Profile', path: '/student-profile' },
+  { id: 'student-profile', code: '1.1', title: 'Student List', path: '/student-profile' },
   { id: 'faculty-profile', code: '1.2', title: 'Faculty Profile', path: '/faculty-profile' },
   { id: 'events', code: '1.3', title: 'Events', path: '/events' },
   { id: 'scheduling', code: '1.4', title: 'Scheduling', path: '/scheduling' },
@@ -56,10 +56,28 @@ function SummaryCard({ label, value, hint, link }) {
 export default function Dashboard() {
   const [search, setSearch] = useState('')
   const query = search.toLowerCase()
+  const [modules, setModules] = useState(MODULES)
 
   // --- Weather State ---
   const [weather, setWeather] = useState(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('authUser')
+      const user = raw ? JSON.parse(raw) : null
+      const role = user?.role || null
+      setModules(
+        MODULES.map((m) =>
+          m.id === 'student-profile'
+            ? { ...m, title: role === 'admin' ? 'Student List' : 'Student Profile' }
+            : m
+        )
+      )
+    } catch {
+      setModules(MODULES)
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchWeather() {
@@ -171,7 +189,7 @@ export default function Dashboard() {
           </div>
 
           <section className="summary-row" style={{ marginTop: '24px' }}>
-            {MODULES.map((m) => (
+            {modules.map((m) => (
               <SummaryCard
                 key={m.id}
                 label={m.title}
@@ -225,7 +243,7 @@ export default function Dashboard() {
                       <td>{item.meta}</td>
                       <td className="tag">
                         <Link to={`/${item.module}`}>
-                          {MODULES.find((m) => m.id === item.module)?.title ?? item.module}
+                          {modules.find((m) => m.id === item.module)?.title ?? item.module}
                         </Link>
                       </td>
                     </tr>

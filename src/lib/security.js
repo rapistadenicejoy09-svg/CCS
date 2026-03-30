@@ -116,6 +116,9 @@ export function hasPermission(permission) {
  * Check if the current role can access a path
  */
 export function canAccessPath(path) {
+  if (path === '/admin/create-student' || path.startsWith('/admin/student/')) {
+    return hasPermission(PERMISSIONS.MANAGE_USERS)
+  }
   const perm = PATH_PERMISSIONS[path]
   if (!perm) return true
   return hasPermission(perm)

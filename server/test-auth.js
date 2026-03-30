@@ -3,9 +3,10 @@ import speakeasy from 'speakeasy'
 const API_URL = 'http://localhost:5000/api'
 const TEST_USER = {
   role: 'student',
-  identifier: 'teststudent2@example.com',
+  studentId: 'teststudent2',
+  email: 'teststudent2@example.com',
   password: 'securepassword123',
-  fullName: 'Test Student 2'
+  fullName: 'Test Student 2',
 }
 
 let token = null
@@ -26,7 +27,13 @@ async function runTests() {
   console.log('1. Registering user...')
   let res = await request('/auth/register', {
     method: 'POST',
-    body: JSON.stringify(TEST_USER)
+    body: JSON.stringify({
+      role: TEST_USER.role,
+      studentId: TEST_USER.studentId,
+      email: TEST_USER.email,
+      password: TEST_USER.password,
+      fullName: TEST_USER.fullName,
+    }),
   })
   if (res.status === 201 || res.status === 409) {
     console.log('   ✅ User registered (or already exists)')
@@ -38,7 +45,7 @@ async function runTests() {
   console.log('2. Logging in...')
   res = await request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier: TEST_USER.identifier, password: TEST_USER.password })
+    body: JSON.stringify({ identifier: TEST_USER.email, password: TEST_USER.password }),
   })
   if (res.status === 200 && res.body.token) {
     token = res.body.token
@@ -84,7 +91,11 @@ async function runTests() {
   console.log('6. Logging in again with 2FA...')
   res = await request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier: TEST_USER.identifier, password: TEST_USER.password, twoFACode: speakeasy.totp({ secret: twoFaSecret, encoding: 'base32' }) })
+    body: JSON.stringify({
+      identifier: TEST_USER.email,
+      password: TEST_USER.password,
+      twoFACode: speakeasy.totp({ secret: twoFaSecret, encoding: 'base32' }),
+    }),
   })
   if (res.status === 200) {
     console.log('   ✅ Logic with 2FA code successful')
@@ -97,7 +108,7 @@ async function runTests() {
   for (let i = 0; i < 6; i++) {
     res = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ identifier: TEST_USER.identifier, password: 'wrongpassword' })
+      body: JSON.stringify({ identifier: TEST_USER.email, password: 'wrongpassword' }),
     })
   }
   if (res.status === 429) {

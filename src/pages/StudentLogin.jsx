@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { apiLogin } from '../lib/api'
 
 export default function StudentLogin() {
@@ -127,10 +127,7 @@ export default function StudentLogin() {
         </form>
 
         <div className="auth-footer-text">
-          <span>Need an account?</span>{' '}
-          <Link to="/student/register" className="auth-link">
-            Register
-          </Link>
+          Student accounts are created by the administrator.
         </div>
       </div>
     </div>
