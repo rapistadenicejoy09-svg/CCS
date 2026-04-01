@@ -23,9 +23,31 @@ initDb(db)
 
 const app = express()
 app.use(helmet())
+
+const configuredCorsOrigins = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+const isDev = process.env.NODE_ENV !== 'production'
+const isLocalViteOrigin = (origin) =>
+  /^http:\/\/(localhost|127\.0\.0\.1):\d{2,5}$/.test(String(origin || ''))
+
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin(origin, cb) {
+      // Allow non-browser clients (curl/postman) and same-origin requests.
+      if (!origin) return cb(null, true)
+
+      if (configuredCorsOrigins.length > 0) {
+        return cb(null, configuredCorsOrigins.includes(origin))
+      }
+
+      // Dev default: allow Vite on any localhost port (5173, 5174, etc.).
+      if (isDev && isLocalViteOrigin(origin)) return cb(null, true)
+
+      return cb(null, false)
+    },
     credentials: false,
   })
 )
@@ -382,8 +404,27 @@ app.patch('/api/admin/users/:id', authMiddleware, authorize(PERMISSIONS.MANAGE_U
   res.json({ ok: true, user })
 })
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API server listening on http://localhost:${PORT}`)
-})
+const MAX_PORT_TRIES = 20
+
+function startListening(port, triesLeft) {
+  const server = app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`API server listening on http://localhost:${port}`)
+  })
+
+  server.on('error', (err) => {
+    if (err?.code === 'EADDRINUSE' && triesLeft > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(`Port ${port} is in use. Trying ${port + 1}...`)
+      server.close(() => startListening(port + 1, triesLeft - 1))
+      return
+    }
+
+    // eslint-disable-next-line no-console
+    console.error(err)
+    process.exit(1)
+  })
+}
+
+startListening(PORT, MAX_PORT_TRIES)
 

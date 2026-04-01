@@ -1,6 +1,7 @@
 import speakeasy from 'speakeasy'
 
-const API_URL = 'http://localhost:5000/api'
+const PORT = Number(process.env.PORT || 5000)
+const API_URL = process.env.API_URL || `http://localhost:${PORT}/api`
 const TEST_USER = {
   role: 'student',
   studentId: 'teststudent2',

@@ -1,19 +1,110 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000'
+const CONFIGURED_API_BASE = import.meta.env.VITE_API_BASE || ''
+const DEFAULT_API_START_PORT = 5000
+const DEFAULT_API_PORT_SCAN = 25 // 5000-5024
+
+function buildDefaultCandidates() {
+  const out = []
+  for (let p = DEFAULT_API_START_PORT; p < DEFAULT_API_START_PORT + DEFAULT_API_PORT_SCAN; p++) {
+    out.push(`http://localhost:${p}`)
+  }
+  return out
+}
+
+const DEFAULT_API_CANDIDATES = buildDefaultCandidates()
+
+let resolvedApiBasePromise = null
+
+async function fetchWithTimeout(url, { timeoutMs = 800, ...options } = {}) {
+  const controller = new AbortController()
+  const t = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+async function resolveApiBase() {
+  if (CONFIGURED_API_BASE) return CONFIGURED_API_BASE
+
+  // Persist across reloads for a smoother dev experience.
+  const cached =
+    typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ccs_api_base') : null
+  if (cached) return cached
+
+  // Prefer same-origin (works in prod if frontend is served by backend or a reverse proxy).
+  try {
+    const res = await fetchWithTimeout('/api/health', { method: 'GET', timeoutMs: 600 })
+    if (res.ok) {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('ccs_api_base', '')
+      return ''
+    }
+  } catch {
+    // ignore
+  }
+
+  // Dev fallback: detect which localhost backend port is actually alive.
+  for (const base of DEFAULT_API_CANDIDATES) {
+    try {
+      const res = await fetchWithTimeout(`${base}/api/health`, { method: 'GET', timeoutMs: 800 })
+      if (res.ok) {
+        if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('ccs_api_base', base)
+        return base
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Last resort.
+  return DEFAULT_API_CANDIDATES[0]
+}
+
+function clearCachedApiBase() {
+  resolvedApiBasePromise = null
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('ccs_api_base')
+  } catch {
+    // ignore
+  }
+}
+
+async function getApiBase() {
+  if (!resolvedApiBasePromise) resolvedApiBasePromise = resolveApiBase()
+  return resolvedApiBasePromise
+}
 
 async function request(path, options = {}) {
   const { headers: optionHeaders, ...rest } = options
   let res
   try {
-    res = await fetch(`${API_BASE}${path}`, {
-      ...rest,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(optionHeaders || {}),
-      },
-    })
+    let API_BASE = await getApiBase()
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        ...rest,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(optionHeaders || {}),
+        },
+      })
+    } catch {
+      // If the cached/resolved base is stale (e.g. backend moved from 5001 -> 5003),
+      // clear it and retry resolution once.
+      clearCachedApiBase()
+      API_BASE = await getApiBase()
+      res = await fetch(`${API_BASE}${path}`, {
+        ...rest,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(optionHeaders || {}),
+        },
+      })
+    }
   } catch (e) {
+    const API_BASE = await getApiBase().catch(() => CONFIGURED_API_BASE || DEFAULT_API_CANDIDATES[0])
+    const shown = API_BASE ? API_BASE : '(same origin)'
     const err = new Error(
-      `Unable to reach API server at ${API_BASE}. Is the backend running?`,
+      `Unable to reach API server at ${shown}. Is the backend running?`,
     )
     err.cause = e
     throw err

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import net from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -7,8 +8,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 
-const PORT = Number(process.env.PORT || 5000)
-const healthUrl = `http://localhost:${PORT}/api/health`
+const DEFAULT_PORT = Number(process.env.PORT || 5000)
+const MAX_PORT_PROBES = 20
+const PER_PORT_STARTUP_TIMEOUT_MS = 5000
 
 let serverProcess = null
 let viteProcess = null
@@ -30,27 +32,86 @@ function spawnProcess(command, args, options) {
   return child
 }
 
-async function waitForBackendReady(timeoutMs = 30000) {
+async function fetchWithTimeout(url, { timeoutMs = 750, ...options } = {}) {
+  const controller = new AbortController()
+  const t = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+function healthUrlForPort(port) {
+  return `http://localhost:${port}/api/health`
+}
+
+async function isHealthyBackend(port) {
+  try {
+    const res = await fetchWithTimeout(healthUrlForPort(port), { method: 'GET' })
+    return Boolean(res?.ok)
+  } catch {
+    return false
+  }
+}
+
+async function isPortFree(port, timeoutMs = 250) {
+  // If we can connect, something is already listening.
+  // If we get ECONNREFUSED (or timeout), assume it's free enough to try.
+  return await new Promise((resolve) => {
+    const socket = new net.Socket()
+    const done = (free) => {
+      try {
+        socket.destroy()
+      } catch {
+        // ignore
+      }
+      resolve(free)
+    }
+
+    const t = setTimeout(() => done(true), timeoutMs)
+    socket.once('connect', () => {
+      clearTimeout(t)
+      done(false)
+    })
+    socket.once('error', () => {
+      clearTimeout(t)
+      done(true)
+    })
+    socket.connect(port, '127.0.0.1')
+  })
+}
+
+async function pickFreePort(startPort) {
+  for (let i = 0; i < MAX_PORT_PROBES; i++) {
+    const port = startPort + i
+    if (await isPortFree(port)) return port
+  }
+  return startPort
+}
+
+async function waitForBackendReady(child, port, timeoutMs) {
   const start = Date.now()
+  let exited = null
+  const onExit = (code) => {
+    exited = code ?? 0
+  }
+  child.once('exit', onExit)
   while (Date.now() - start < timeoutMs) {
+    if (exited !== null) {
+      child.removeListener('exit', onExit)
+      throw new Error(`Backend exited before becoming healthy (port ${port}, exit code ${exited}).`)
+    }
     try {
-      const res = await fetch(healthUrl, { method: 'GET' })
+      const res = await fetchWithTimeout(healthUrlForPort(port), { method: 'GET', timeoutMs: 750 })
       if (res.ok) return
     } catch {
       // ignore until backend is up
     }
     await new Promise((r) => setTimeout(r, 250))
   }
-  throw new Error(`Backend did not start. Expected ${healthUrl} to respond.`)
-}
-
-async function isBackendUp() {
-  try {
-    const res = await fetch(healthUrl, { method: 'GET' })
-    return res.ok
-  } catch {
-    return false
-  }
+  child.removeListener('exit', onExit)
+  throw new Error(`Backend did not start. Expected ${healthUrlForPort(port)} to respond.`)
 }
 
 const serverEntry = path.join(rootDir, 'server', 'index.js')
@@ -62,12 +123,24 @@ const viteBin = path.join(
 )
 
 async function main() {
-  if (!(await isBackendUp())) {
-    serverProcess = spawnProcess(process.execPath, [serverEntry])
-    await waitForBackendReady()
-  }
+  // Always start a fresh backend on a free port. This avoids accidentally reusing
+  // a stale process on :5000 that "looks healthy" to Node but is blocked by browser CORS.
+  const port = await pickFreePort(DEFAULT_PORT)
 
-  viteProcess = spawnProcess(viteBin, [], process.platform === 'win32' ? { shell: true } : {})
+  const child = spawnProcess(process.execPath, [serverEntry], {
+    env: { ...process.env, PORT: String(port) },
+  })
+  serverProcess = child
+
+  await waitForBackendReady(child, port, PER_PORT_STARTUP_TIMEOUT_MS)
+
+  viteProcess = spawnProcess(
+    viteBin,
+    [],
+    process.platform === 'win32'
+      ? { shell: true, env: { ...process.env, VITE_API_BASE: `http://localhost:${port}` } }
+      : { env: { ...process.env, VITE_API_BASE: `http://localhost:${port}` } }
+  )
 }
 
 function shutdown() {
