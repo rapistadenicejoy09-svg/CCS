@@ -169,7 +169,7 @@ export default function AdminProfile() {
 
   return (
     <div className="profile-page profile-page-admin">
-      <div className="profile-hero profile-hero-admin">
+      <div className="profile-hero profile-hero-admin admin-student-list-header-enter">
         <div className="profile-hero-badge">Admin</div>
         {profile?.profileImageUrl ? (
           <img
@@ -185,11 +185,19 @@ export default function AdminProfile() {
       </div>
 
       {loadError && (
-        <div className="mb-4 p-4 rounded-xl text-rose-400 bg-rose-500/10 border border-rose-500/20 text-sm">{loadError}</div>
+        <div
+          className="mb-4 p-4 rounded-xl text-rose-400 bg-rose-500/10 border border-rose-500/20 text-sm admin-animate-reveal"
+          style={{ animationDelay: '0.06s' }}
+        >
+          {loadError}
+        </div>
       )}
 
-      <div className="profile-grid">
-        <div className="profile-card profile-card-admin">
+      <div className="profile-grid admin-student-list-section-enter">
+        <div
+          className="profile-card profile-card-admin admin-student-card-animate"
+          style={{ animationDelay: '0s' }}
+        >
           <h3 className="profile-card-title">Account information</h3>
           <form onSubmit={handleSaveProfile} className="space-y-4 text-left">
             <div>
@@ -231,7 +239,10 @@ export default function AdminProfile() {
           </form>
         </div>
 
-        <div className="profile-card profile-card-admin">
+        <div
+          className="profile-card profile-card-admin admin-student-card-animate"
+          style={{ animationDelay: `${1 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Password</h3>
           <form onSubmit={handleChangePassword} className="space-y-4 text-left">
             <div>
@@ -278,7 +289,10 @@ export default function AdminProfile() {
           </form>
         </div>
 
-        <div className="profile-card profile-card-admin">
+        <div
+          className="profile-card profile-card-admin admin-student-card-animate"
+          style={{ animationDelay: `${2 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Two-factor authentication</h3>
           <p className="text-sm text-[var(--text-muted)] mb-4">
             Status:{' '}

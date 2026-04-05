@@ -182,7 +182,7 @@ export default function StudentProfile() {
 
   return (
     <div className="profile-page profile-page-student">
-      <div className="profile-hero profile-hero-student">
+      <div className="profile-hero profile-hero-student admin-student-list-header-enter">
         <div className="profile-hero-badge">Student</div>
         {profile?.profileImageUrl ? (
           <img
@@ -215,7 +215,7 @@ export default function StudentProfile() {
       </div>
 
       {showPasswordReminder ? (
-        <div className="student-profile-password-alert" role="status">
+        <div className="student-profile-password-alert admin-student-list-toolbar-enter" role="status">
           <strong>Change your password</strong>
           <p>
             Your login password was set by an administrator. Update it below so only you know it.
@@ -224,11 +224,19 @@ export default function StudentProfile() {
       ) : null}
 
       {error && (
-        <div className="mb-4 p-4 rounded-xl text-rose-400 bg-rose-500/10 border border-rose-500/20 text-sm">{error}</div>
+        <div
+          className="mb-4 p-4 rounded-xl text-rose-400 bg-rose-500/10 border border-rose-500/20 text-sm admin-animate-reveal"
+          style={{ animationDelay: '0.06s' }}
+        >
+          {error}
+        </div>
       )}
 
-      <div className="profile-grid profile-grid-student">
-        <div className="profile-card profile-card-student">
+      <div className="profile-grid profile-grid-student admin-student-list-section-enter">
+        <div
+          className="profile-card profile-card-student admin-student-card-animate"
+          style={{ animationDelay: '0s' }}
+        >
           <h3 className="profile-card-title">Student information</h3>
           <ul className="profile-card-list">
             <li>
@@ -249,7 +257,10 @@ export default function StudentProfile() {
           </ul>
         </div>
 
-        <div className="profile-card profile-card-student">
+        <div
+          className="profile-card profile-card-student admin-student-card-animate"
+          style={{ animationDelay: `${1 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Academic summary</h3>
           <ul className="profile-card-list">
             <li>
@@ -261,7 +272,10 @@ export default function StudentProfile() {
           </ul>
         </div>
 
-        <div className="profile-card profile-card-student">
+        <div
+          className="profile-card profile-card-student admin-student-card-animate"
+          style={{ animationDelay: `${2 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Password</h3>
           <form onSubmit={handleChangePassword} className="space-y-4 text-left">
             <div>
@@ -308,7 +322,10 @@ export default function StudentProfile() {
           </form>
         </div>
 
-        <div className="profile-card profile-card-student">
+        <div
+          className="profile-card profile-card-student admin-student-card-animate"
+          style={{ animationDelay: `${3 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Profile picture</h3>
           <p className="text-sm text-[var(--text-muted)] mb-3">
             Optional image URL for your avatar in the header.
@@ -327,7 +344,10 @@ export default function StudentProfile() {
           </form>
         </div>
 
-        <div className="profile-card profile-card-student">
+        <div
+          className="profile-card profile-card-student admin-student-card-animate"
+          style={{ animationDelay: `${4 * 0.055}s` }}
+        >
           <h3 className="profile-card-title">Two-factor authentication</h3>
           <p className="text-sm text-[var(--text-muted)] mb-4">
             Add an extra layer of security to your login. Scan the QR code with an authenticator app (Google Authenticator,
