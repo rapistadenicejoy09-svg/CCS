@@ -2718,6 +2718,25 @@ body[data-theme='light'] .admin-student-card:hover {
     0 0 0 2px rgba(229, 118, 47, 0.4);
 }
 
+/*
+ * Student list status pills: Tailwind `dark:` follows OS preference, not `body[data-theme]`,
+ * so light app theme + dark OS could apply `dark:text-emerald-400` (~#34d399) and wash out on pale green.
+ * These rules align pill colors with the in-app theme for readable contrast on light mode.
+ */
+body[data-theme='light'] .admin-student-status-pill--success {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+}
+
+body[data-theme='light'] .admin-student-status-pill--danger {
+  background-color: #ffe4e6 !important;
+  color: #9f1239 !important;
+}
+
+body[data-theme='light'] .admin-student-status-pill--neutral {
+  color: #374151 !important;
+}
+
 /* De-emphasize other cards while one is hovered */
 .admin-student-card-grid:has(> .admin-student-card:hover) > .admin-student-card:not(:hover) {
   transform: scale(0.96);

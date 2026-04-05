@@ -474,7 +474,13 @@ export default function AdminStudentList() {
                             <h3 className="text-base font-bold text-[var(--text)] mb-0.5 leading-tight">{student.full_name || 'Unnamed Student'}</h3>
                             <p className="text-[var(--accent)] font-mono text-xs">{displayStudentId(student)}</p>
                           </div>
-                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                          <span
+                            className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              active
+                                ? 'admin-student-status-pill--success bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'admin-student-status-pill--danger bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                            }`}
+                          >
                             {active ? 'Active' : 'Inactive'}
                           </span>
                         </div>
@@ -500,13 +506,15 @@ export default function AdminStudentList() {
                             {/* Enrollment Status */}
                             <div>
                                <p className="text-[var(--text-muted)] text-[10px] uppercase font-bold mb-1 tracking-wider">Enrollment</p>
-                               <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${
-                                 student.academic_info?.enrollment_status === 'Enrolled'
-                                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                   : student.academic_info?.enrollment_status === 'Not Enrolled'
-                                   ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                                   : 'bg-[var(--border-color)] text-[var(--text-muted)]'
-                               }`}>
+                               <span
+                                 className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${
+                                   student.academic_info?.enrollment_status === 'Enrolled'
+                                     ? 'admin-student-status-pill--success bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                     : student.academic_info?.enrollment_status === 'Not Enrolled'
+                                     ? 'admin-student-status-pill--danger bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                                     : 'admin-student-status-pill--neutral bg-[var(--border-color)] text-[var(--text-muted)]'
+                                 }`}
+                               >
                                  {student.academic_info?.enrollment_status || 'Unknown'}
                                </span>
                             </div>
@@ -661,13 +669,15 @@ export default function AdminStudentList() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${
-                                  student.academic_info?.enrollment_status === 'Enrolled'
-                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                    : student.academic_info?.enrollment_status === 'Not Enrolled'
-                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                                    : 'bg-[var(--border-color)] text-[var(--text-muted)]'
-                                }`}>
+                                <span
+                                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${
+                                    student.academic_info?.enrollment_status === 'Enrolled'
+                                      ? 'admin-student-status-pill--success bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                      : student.academic_info?.enrollment_status === 'Not Enrolled'
+                                      ? 'admin-student-status-pill--danger bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                                      : 'admin-student-status-pill--neutral bg-[var(--border-color)] text-[var(--text-muted)]'
+                                  }`}
+                                >
                                   {student.academic_info?.enrollment_status || 'Unknown'}
                                 </span>
                               </td>

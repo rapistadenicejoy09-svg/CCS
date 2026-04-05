@@ -1,4 +1,9 @@
-const CONFIGURED_API_BASE = import.meta.env.VITE_API_BASE || ''
+function normalizeApiBase(base) {
+  if (base == null || base === '') return ''
+  return String(base).replace(/\/+$/, '')
+}
+
+const CONFIGURED_API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || '')
 const DEFAULT_API_START_PORT = 5000
 const DEFAULT_API_PORT_SCAN = 25 // 5000-5024
 
@@ -12,6 +17,8 @@ function buildDefaultCandidates() {
 
 const DEFAULT_API_CANDIDATES = buildDefaultCandidates()
 
+const IS_PROD_BUILD = import.meta.env.PROD
+
 let resolvedApiBasePromise = null
 
 async function fetchWithTimeout(url, { timeoutMs = 800, ...options } = {}) {
@@ -24,15 +31,29 @@ async function fetchWithTimeout(url, { timeoutMs = 800, ...options } = {}) {
   }
 }
 
+function isLocalhostCacheInvalidInProd(cached) {
+  if (!IS_PROD_BUILD || !cached) return false
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(String(cached).trim())
+}
+
 async function resolveApiBase() {
   if (CONFIGURED_API_BASE) return CONFIGURED_API_BASE
 
-  // Persist across reloads for a smoother dev experience.
-  const cached =
+  const cachedRaw =
     typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ccs_api_base') : null
-  if (cached) return cached
+  if (cachedRaw !== null && cachedRaw !== undefined) {
+    if (isLocalhostCacheInvalidInProd(cachedRaw)) {
+      try {
+        sessionStorage.removeItem('ccs_api_base')
+      } catch {
+        // ignore
+      }
+    } else if (cachedRaw !== '') {
+      return cachedRaw
+    }
+  }
 
-  // Prefer same-origin (works in prod if frontend is served by backend or a reverse proxy).
+  // Prefer same-origin (works if the API is reverse-proxied with the static site).
   try {
     const res = await fetchWithTimeout('/api/health', { method: 'GET', timeoutMs: 600 })
     if (res.ok) {
@@ -41,6 +62,11 @@ async function resolveApiBase() {
     }
   } catch {
     // ignore
+  }
+
+  // Production static hosting (e.g. Vercel): never fall back to scanning localhost.
+  if (IS_PROD_BUILD) {
+    return null
   }
 
   // Dev fallback: detect which localhost backend port is actually alive.
@@ -56,7 +82,7 @@ async function resolveApiBase() {
     }
   }
 
-  // Last resort.
+  // Last resort (local dev).
   return DEFAULT_API_CANDIDATES[0]
 }
 
@@ -70,7 +96,19 @@ function clearCachedApiBase() {
 }
 
 async function getApiBase() {
-  if (!resolvedApiBasePromise) resolvedApiBasePromise = resolveApiBase()
+  if (!resolvedApiBasePromise) {
+    resolvedApiBasePromise = (async () => {
+      const base = await resolveApiBase()
+      if (base === null) {
+        const err = new Error(
+          'Missing VITE_API_BASE: In Vercel → Project → Settings → Environment Variables, add VITE_API_BASE with your deployed API URL (https://…, no trailing slash), then redeploy. On your API host set CORS_ORIGINS to this site’s origin.',
+        )
+        err.isConfigError = true
+        throw err
+      }
+      return base
+    })()
+  }
   return resolvedApiBasePromise
 }
 
@@ -101,11 +139,10 @@ async function request(path, options = {}) {
       })
     }
   } catch (e) {
+    if (e && e.isConfigError) throw e
     const API_BASE = await getApiBase().catch(() => CONFIGURED_API_BASE || DEFAULT_API_CANDIDATES[0])
     const shown = API_BASE ? API_BASE : '(same origin)'
-    const err = new Error(
-      `Unable to reach API server at ${shown}. Is the backend running?`,
-    )
+    const err = new Error(`Unable to reach API server at ${shown}. Is the backend running?`)
     err.cause = e
     throw err
   }
@@ -253,4 +290,3 @@ export async function api2faVerify(token, code) {
     body: JSON.stringify({ code }),
   })
 }
-
