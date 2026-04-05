@@ -1,102 +1,322 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  api2faSetup,
+  api2faVerify,
+  apiChangePassword,
+  apiGetAccountProfile,
+  apiPatchAccountProfile,
+} from '../lib/api'
 
-const IconAccount = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-)
+function getRole() {
+  try {
+    const raw = localStorage.getItem('authUser')
+    return raw ? JSON.parse(raw)?.role : null
+  } catch {
+    return null
+  }
+}
 
-const IconSecurity = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-)
-
-const IconSystem = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-)
-
-const IconActivity = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-)
-
-const ADMIN_SECTIONS = [
-  {
-    Icon: IconAccount,
-    title: 'Account Information',
-    items: ['Full name', 'Email address', 'Role & permissions', 'Account status'],
-  },
-  {
-    Icon: IconSecurity,
-    title: 'Security & Access',
-    items: ['Password management', 'Login history', 'Two-factor authentication', 'Session management'],
-  },
-  {
-    Icon: IconSystem,
-    title: 'System Access',
-    items: ['Dashboard overview', 'Student records access', 'Faculty management', 'Reports & analytics'],
-  },
-  {
-    Icon: IconActivity,
-    title: 'Activity Log',
-    items: ['Recent actions', 'Audit trail', 'Export logs'],
-  },
-]
+function mergeAuthUserFromProfile(profile) {
+  try {
+    const raw = localStorage.getItem('authUser')
+    const u = raw ? JSON.parse(raw) : {}
+    const next = {
+      ...u,
+      fullName: profile.fullName ?? u.fullName,
+      profileImageUrl: profile.profileImageUrl ?? u.profileImageUrl,
+      displayName: profile.displayName ?? profile.fullName ?? u.displayName,
+    }
+    localStorage.setItem('authUser', JSON.stringify(next))
+    window.dispatchEvent(new Event('ccs-auth-user-updated'))
+  } catch {
+    // ignore
+  }
+}
 
 export default function AdminProfile() {
-  const [admin, setAdmin] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileMsg, setProfileMsg] = useState('')
 
-  useEffect(() => {
+  const [fullNameInput, setFullNameInput] = useState('')
+  const [profileImageUrlInput, setProfileImageUrlInput] = useState('')
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwdMsg, setPwdMsg] = useState('')
+  const [pwdError, setPwdError] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
+
+  const [twoFAQr, setTwoFAQr] = useState(null)
+  const [twoFACode, setTwoFACode] = useState('')
+  const [twoFAError, setTwoFAError] = useState('')
+  const [twoFAMsg, setTwoFAMsg] = useState('')
+  const [twoFALoading, setTwoFALoading] = useState(false)
+
+  const isAdmin = getRole() === 'admin'
+
+  const loadProfile = useCallback(async () => {
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+    setLoadError('')
     try {
-      const session = localStorage.getItem('adminSession')
-      if (session) {
-        setAdmin(JSON.parse(session))
-      }
-    } catch {
-      setAdmin(null)
+      const res = await apiGetAccountProfile(token)
+      const p = res?.profile
+      setProfile(p)
+      setFullNameInput(p?.fullName || '')
+      setProfileImageUrlInput(p?.profileImageUrl || '')
+      if (p?.twofaEnabled) setTwoFAQr(null)
+    } catch (e) {
+      setLoadError(e?.message || 'Failed to load profile.')
     }
   }, [])
 
-  const displayName = admin?.fullName || admin?.email || 'Administrator'
+  useEffect(() => {
+    if (isAdmin) loadProfile()
+  }, [isAdmin, loadProfile])
+
+  async function handleSaveProfile(e) {
+    e.preventDefault()
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+    setSavingProfile(true)
+    setProfileMsg('')
+    try {
+      const res = await apiPatchAccountProfile(token, {
+        fullName: fullNameInput.trim(),
+        profileImageUrl: profileImageUrlInput.trim(),
+      })
+      const p = res?.profile
+      setProfile(p)
+      mergeAuthUserFromProfile(p)
+      setProfileMsg('Profile updated.')
+    } catch (err) {
+      setProfileMsg(err?.message || 'Could not save profile.')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    setPwdError('')
+    setPwdMsg('')
+    if (newPassword !== confirmPassword) {
+      setPwdError('New passwords do not match.')
+      return
+    }
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+    setPwdSaving(true)
+    try {
+      await apiChangePassword(token, { currentPassword, newPassword })
+      setPwdMsg('Password changed successfully.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPwdError(err?.message || 'Could not change password.')
+    } finally {
+      setPwdSaving(false)
+    }
+  }
+
+  async function handleStart2FA() {
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+    setTwoFAError('')
+    setTwoFAMsg('')
+    setTwoFALoading(true)
+    try {
+      const res = await api2faSetup(token)
+      setTwoFAQr(res?.qrCode || null)
+      setTwoFACode('')
+    } catch (err) {
+      setTwoFAError(err?.message || 'Could not start 2FA setup.')
+    } finally {
+      setTwoFALoading(false)
+    }
+  }
+
+  async function handleVerify2FA(e) {
+    e.preventDefault()
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+    setTwoFAError('')
+    setTwoFAMsg('')
+    setTwoFALoading(true)
+    try {
+      await api2faVerify(token, twoFACode.trim())
+      setTwoFAMsg('Two-factor authentication is now enabled.')
+      setTwoFAQr(null)
+      setTwoFACode('')
+      await loadProfile()
+    } catch (err) {
+      setTwoFAError(err?.message || 'Invalid code.')
+    } finally {
+      setTwoFALoading(false)
+    }
+  }
+
+  if (!isAdmin) {
+    return <div className="p-8 text-center text-[var(--text-muted)]">Administrators only.</div>
+  }
+
+  const displayName = profile?.fullName || profile?.identifier || 'Administrator'
+  const heroLetter = displayName.charAt(0).toUpperCase()
 
   return (
     <div className="profile-page profile-page-admin">
       <div className="profile-hero profile-hero-admin">
         <div className="profile-hero-badge">Admin</div>
-        <div className="profile-avatar profile-avatar-admin">
-          {displayName.charAt(0).toUpperCase()}
-        </div>
+        {profile?.profileImageUrl ? (
+          <img
+            src={profile.profileImageUrl}
+            alt=""
+            className="profile-avatar profile-avatar-admin profile-avatar-image"
+          />
+        ) : (
+          <div className="profile-avatar profile-avatar-admin">{heroLetter}</div>
+        )}
         <h1 className="profile-hero-title">{displayName}</h1>
         <p className="profile-hero-subtitle">System Administrator</p>
       </div>
 
+      {loadError && (
+        <div className="mb-4 p-4 rounded-xl text-rose-400 bg-rose-500/10 border border-rose-500/20 text-sm">{loadError}</div>
+      )}
+
       <div className="profile-grid">
-        {ADMIN_SECTIONS.map((section, i) => (
-          <div key={i} className="profile-card profile-card-admin">
-            <h3 className="profile-card-title">
-              <span className="profile-card-icon profile-card-icon-svg">
-                <section.Icon />
-              </span>
-              {section.title}
-            </h3>
-            <ul className="profile-card-list">
-              {section.items.map((item, j) => (
-                <li key={j}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <div className="profile-card profile-card-admin">
+          <h3 className="profile-card-title">Account information</h3>
+          <form onSubmit={handleSaveProfile} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Login email
+              </label>
+              <div className="search-input w-full opacity-80 cursor-not-allowed">
+                {profile?.email || profile?.identifier || '—'}
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Administrators sign in with this email address.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Full name
+              </label>
+              <input
+                className="search-input w-full"
+                value={fullNameInput}
+                onChange={(e) => setFullNameInput(e.target.value)}
+                placeholder="Display name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Profile picture URL
+              </label>
+              <input
+                className="search-input w-full"
+                value={profileImageUrlInput}
+                onChange={(e) => setProfileImageUrlInput(e.target.value)}
+                placeholder="https://…"
+              />
+              <p className="text-xs text-[var(--text-muted)] mt-1">Paste a direct image link (optional).</p>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={savingProfile}>
+              {savingProfile ? 'Saving…' : 'Save account'}
+            </button>
+            {profileMsg ? <p className="text-sm text-[var(--text-muted)]">{profileMsg}</p> : null}
+          </form>
+        </div>
+
+        <div className="profile-card profile-card-admin">
+          <h3 className="profile-card-title">Password</h3>
+          <form onSubmit={handleChangePassword} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Current password
+              </label>
+              <input
+                type="password"
+                className="search-input w-full"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                New password
+              </label>
+              <input
+                type="password"
+                className="search-input w-full"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Confirm new password
+              </label>
+              <input
+                type="password"
+                className="search-input w-full"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            {pwdError ? <p className="text-sm text-rose-400">{pwdError}</p> : null}
+            {pwdMsg ? <p className="text-sm text-emerald-600 dark:text-emerald-400">{pwdMsg}</p> : null}
+            <button type="submit" className="btn btn-primary" disabled={pwdSaving}>
+              {pwdSaving ? 'Updating…' : 'Change password'}
+            </button>
+          </form>
+        </div>
+
+        <div className="profile-card profile-card-admin">
+          <h3 className="profile-card-title">Two-factor authentication</h3>
+          <p className="text-sm text-[var(--text-muted)] mb-4">
+            Status:{' '}
+            <strong className="text-[var(--text)]">{profile?.twofaEnabled ? 'Enabled' : 'Not enabled'}</strong>
+          </p>
+          {!profile?.twofaEnabled && (
+            <>
+              <button type="button" className="btn btn-secondary mb-4" onClick={handleStart2FA} disabled={twoFALoading}>
+                {twoFALoading && !twoFAQr ? 'Preparing…' : 'Set up authenticator app'}
+              </button>
+              {twoFAQr && (
+                <form onSubmit={handleVerify2FA} className="space-y-4">
+                  <img src={twoFAQr} alt="2FA QR" className="max-w-[200px] rounded-lg border border-[var(--border-color)]" />
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                      6-digit code
+                    </label>
+                    <input
+                      className="search-input w-full max-w-xs"
+                      value={twoFACode}
+                      onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="000000"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  {twoFAError ? <p className="text-sm text-rose-400">{twoFAError}</p> : null}
+                  {twoFAMsg ? <p className="text-sm text-emerald-600 dark:text-emerald-400">{twoFAMsg}</p> : null}
+                  <button type="submit" className="btn btn-primary" disabled={twoFALoading || twoFACode.length < 6}>
+                    Verify and enable
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+          {profile?.twofaEnabled && (
+            <p className="text-sm text-[var(--text-muted)]">Your account is protected with an authenticator app.</p>
+          )}
+        </div>
       </div>
     </div>
   )

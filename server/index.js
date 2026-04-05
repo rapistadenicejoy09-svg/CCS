@@ -1,9 +1,4 @@
-import dotenv from 'dotenv'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import express from 'express'
-
-dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') })
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
@@ -25,8 +20,15 @@ const SESSION_TTL_HOURS = 24
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
 
-// MongoDB connection is async; keep server startup blocked until the store is ready.
-const store = await openStore()
+// Provider init is async for MongoDB; keep server startup blocked until the store is ready.
+let store
+try {
+  store = await openStore()
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error('Failed to open datastore:', err)
+  process.exit(1)
+}
 
 const app = express()
 app.use(helmet())
@@ -107,21 +109,157 @@ async function findUserByLoginCredential(rawLogin) {
   return await store.findUserByLoginCredential(key)
 }
 
+function studentMustChangePassword(u) {
+  if (!u || u.role !== 'student') return false
+  return u.must_change_password === 1 || u.must_change_password === true
+}
+
+function middleInitial(middleName) {
+  const s = String(middleName || '').trim()
+  if (!s) return ''
+  return `${s.charAt(0).toUpperCase()}.`
+}
+
+/**
+ * Normalize personal_information (snake_case / camelCase / alternate keys) and
+ * fill missing parts from full_name so profile UI always has strings to show.
+ */
+function normalizedStudentNameParts(piRaw, fullName, rootNames) {
+  const root = rootNames && typeof rootNames === 'object' ? rootNames : {}
+  const raw = piRaw && typeof piRaw === 'object' ? piRaw : {}
+  let first = String(
+    root.first_name ??
+      root.firstName ??
+      raw.first_name ??
+      raw.firstName ??
+      raw.FirstName ??
+      raw.given_name ??
+      '',
+  ).trim()
+  let middle = String(
+    root.middle_name ??
+      root.middleName ??
+      raw.middle_name ??
+      raw.middleName ??
+      raw.MiddleName ??
+      raw.middle ??
+      '',
+  ).trim()
+  let last = String(
+    root.last_name ??
+      root.lastName ??
+      raw.last_name ??
+      raw.lastName ??
+      raw.LastName ??
+      raw.family_name ??
+      raw.surname ??
+      '',
+  ).trim()
+
+  const fb = String(fullName || '').trim()
+  const tok = fb.split(/\s+/).filter(Boolean)
+  if (tok.length >= 2) {
+    if (!first) first = tok[0]
+    if (!last) last = tok[tok.length - 1]
+    if (!middle && tok.length >= 3) middle = tok.slice(1, -1).join(' ')
+  } else if (tok.length === 1) {
+    if (!first && !last) first = tok[0]
+    else if (!first) first = tok[0]
+    else if (!last) last = tok[0]
+  }
+
+  return { first_name: first, middle_name: middle, last_name: last }
+}
+
+function studentDisplayNameFromPi(pi, fullNameFallback) {
+  const fn = String(pi?.first_name || '').trim()
+  const mn = String(pi?.middle_name || '').trim()
+  const ln = String(pi?.last_name || '').trim()
+  if (fn || mn || ln) {
+    const parts = [fn]
+    const mi = middleInitial(mn)
+    if (mi) parts.push(mi)
+    if (ln) parts.push(ln)
+    return parts.join(' ')
+  }
+  const fb = String(fullNameFallback || '').trim()
+  if (!fb) return 'Student'
+  const tok = fb.split(/\s+/).filter(Boolean)
+  if (tok.length >= 3) {
+    return [tok[0], middleInitial(tok[1]), ...tok.slice(2)].filter(Boolean).join(' ')
+  }
+  return fb
+}
+
+function studentAccountProfileForResponse(p) {
+  const pi = normalizedStudentNameParts(p.personal_information, p.full_name, {
+    first_name: p.first_name,
+    middle_name: p.middle_name,
+    last_name: p.last_name,
+  })
+  const ai = p.academic_info || {}
+  return {
+    role: 'student',
+    displayName: studentDisplayNameFromPi(pi, p.full_name),
+    firstName: pi.first_name,
+    middleName: pi.middle_name,
+    lastName: pi.last_name,
+    studentId: p.student_id || '',
+    email: p.email || '',
+    profileImageUrl: p.profile_image_url || null,
+    twofaEnabled: !!p.twofa_enabled,
+    mustChangePassword: studentMustChangePassword({ ...p, role: 'student' }),
+    summary: {
+      classSection: p.class_section || '',
+      studentType: p.student_type || '',
+      program: ai.program || '',
+      yearLevel: ai.year_level || '',
+      enrollmentStatus: ai.enrollment_status || '',
+    },
+  }
+}
+
+function adminFacultyAccountProfileForResponse(p) {
+  const loginEmail = String(p.email || p.identifier || '').trim()
+  return {
+    role: p.role,
+    identifier: p.identifier || '',
+    fullName: p.full_name || '',
+    email: loginEmail,
+    profileImageUrl: p.profile_image_url || null,
+    twofaEnabled: !!p.twofa_enabled,
+  }
+}
+
 function publicAuthUser(user) {
   if (!user) return null
   if (user.role === 'student') {
+    const pi = normalizedStudentNameParts(user.personal_information, user.full_name, {
+      first_name: user.first_name,
+      middle_name: user.middle_name,
+      last_name: user.last_name,
+    })
+    const displayName = studentDisplayNameFromPi(pi, user.full_name)
     return {
       role: user.role,
       identifier: user.identifier,
       studentId: user.student_id || user.identifier,
       email: user.email || '',
       fullName: user.full_name || '',
+      displayName,
+      firstName: pi.first_name,
+      middleName: pi.middle_name,
+      lastName: pi.last_name,
+      profileImageUrl: user.profile_image_url || null,
+      mustChangePassword: studentMustChangePassword(user),
     }
   }
   return {
     role: user.role,
     identifier: user.identifier,
     fullName: user.full_name || '',
+    displayName: user.full_name || user.identifier || '',
+    profileImageUrl: user.profile_image_url || null,
   }
 }
 
@@ -153,7 +291,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const role = String(req.body?.role || '').trim()
   const password = String(req.body?.password || '')
-  const fullName = String(req.body?.fullName || '').trim() || null
+  let fullName = String(req.body?.fullName || '').trim() || null
   const enable2FA = Boolean(req.body?.enable2FA)
 
   if (!['admin', 'student', 'faculty'].includes(role)) {
@@ -189,6 +327,12 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
     classSection = String(req.body?.classSection || '').trim() || null
     const st = String(req.body?.studentType || 'regular').toLowerCase()
     studentType = st === 'irregular' ? 'irregular' : 'regular'
+    const pi = req.body?.personalInformation || {}
+    const fn = String(pi.first_name || '').trim()
+    const mn = String(pi.middle_name || '').trim()
+    const ln = String(pi.last_name || '').trim()
+    const composed = [fn, mn, ln].filter(Boolean).join(' ')
+    if (composed) fullName = composed
   } else {
     identifier = normalizeIdentifier(req.body?.identifier)
     if (!identifier || identifier.length < 3) {
@@ -196,24 +340,38 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
     }
     const existing = await store.findUserByIdentifier(identifier)
     if (existing) return res.status(409).json({ error: 'Account already exists' })
+    if (identifier.includes('@')) {
+      emailStored = identifier
+    }
   }
 
   const passwordHash = hashPassword(password)
   const backupCode = enable2FA ? generateBackupCode() : null
 
-  await store.createUser({
-    role,
-    identifier,
-    fullName,
-    passwordHash,
-    enable2FA,
-    backupCode,
-    createdAtIso: nowIso(),
-    classSection,
-    studentType,
-    studentIdStored,
-    emailStored,
-  })
+  try {
+    await store.createUser({
+      role,
+      identifier,
+      fullName,
+      passwordHash,
+      enable2FA,
+      backupCode,
+      createdAtIso: nowIso(),
+      classSection,
+      studentType,
+      studentIdStored,
+      emailStored,
+      academicInfo: req.body?.academicInfo || {},
+      personalInformation: req.body?.personalInformation || {},
+      academicHistory: req.body?.academicHistory || [],
+      nonAcademicActivities: req.body?.nonAcademicActivities || [],
+      violations: req.body?.violations || [],
+      skills: req.body?.skills || [],
+      affiliations: req.body?.affiliations || [],
+    })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
 
   return res.status(201).json({ ok: true, twoFABackupCode: backupCode })
 }))
@@ -287,11 +445,53 @@ app.post('/api/auth/logout', authMiddleware, asyncHandler(async (req, res) => {
 }))
 
 app.get('/api/me', authMiddleware, (req, res) => {
-  res.json({ ok: true, user: req.user })
+  res.json({ ok: true, user: publicAuthUser(req.user) })
 })
 
+app.get('/api/account/profile', authMiddleware, asyncHandler(async (req, res) => {
+  const p = await store.getAccountProfile(req.user.id)
+  if (!p) return res.status(404).json({ error: 'Profile not found' })
+  if (p.role === 'student') {
+    return res.json({ ok: true, profile: studentAccountProfileForResponse(p) })
+  }
+  return res.json({ ok: true, profile: adminFacultyAccountProfileForResponse(p) })
+}))
+
+app.patch('/api/account/profile', authMiddleware, asyncHandler(async (req, res) => {
+  const body = {}
+  if (req.body.profileImageUrl !== undefined) body.profileImageUrl = req.body.profileImageUrl
+  if (req.body.fullName !== undefined) body.fullName = req.body.fullName
+  if (Object.keys(body).length === 0) {
+    return res.status(400).json({ error: 'No updates provided' })
+  }
+  const p = await store.updateAccountProfile(req.user.id, body)
+  if (!p) return res.status(404).json({ error: 'Profile not found' })
+  if (p.role === 'student') {
+    return res.json({ ok: true, profile: studentAccountProfileForResponse(p) })
+  }
+  return res.json({ ok: true, profile: adminFacultyAccountProfileForResponse(p) })
+}))
+
+app.post('/api/account/change-password', authMiddleware, asyncHandler(async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || '')
+  const newPassword = String(req.body?.newPassword || '')
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' })
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' })
+  }
+  const hash = await store.getPasswordHash(req.user.id)
+  if (!hash || !verifyPassword(currentPassword, hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' })
+  }
+  await store.updatePasswordHash(req.user.id, hashPassword(newPassword))
+  res.json({ ok: true })
+}))
+
 app.post('/api/auth/2fa/setup', authMiddleware, asyncHandler(async (req, res) => {
-  const secret = speakeasy.generateSecret({ name: `CCSDashboard (${req.user.identifier})` })
+  const label = String(req.user.email || req.user.identifier || req.user.id || 'user').trim()
+  const secret = speakeasy.generateSecret({ name: `CCSDashboard (${label})` })
   await store.setTwofaSecret(req.user.id, secret.base32)
   
   try {
@@ -346,18 +546,82 @@ app.patch('/api/admin/users/:id', authMiddleware, authorize(PERMISSIONS.MANAGE_U
   if (target.role !== 'student') {
     return res.status(400).json({ error: 'Only student accounts can be updated this way' })
   }
-  if (typeof req.body?.isActive !== 'boolean') {
-    return res.status(400).json({ error: 'Expected isActive boolean' })
+  const updates = {}
+  if (req.body.isActive !== undefined) {
+    if (typeof req.body.isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive must be boolean' })
+    }
+    updates.is_active = req.body.isActive
   }
-  const user = await store.updateUserIsActive(id, req.body.isActive)
+  if (req.body.personalInformation !== undefined) {
+    updates.personal_information = req.body.personalInformation
+    const pi = updates.personal_information
+    const fn = String(pi.first_name || '').trim()
+    const mn = String(pi.middle_name || '').trim()
+    const ln = String(pi.last_name || '').trim()
+    if (fn || ln) {
+      updates.full_name = [fn, mn, ln].filter(Boolean).join(' ')
+    }
+  }
+  if (req.body.academicInfo !== undefined) {
+    updates.academic_info = req.body.academicInfo
+  }
+  if (req.body.academicHistory !== undefined) {
+    updates.academic_history = req.body.academicHistory
+  }
+  if (req.body.nonAcademicActivities !== undefined) {
+    updates.non_academic_activities = req.body.nonAcademicActivities
+  }
+  if (req.body.violations !== undefined) {
+    updates.violations = req.body.violations
+  }
+  if (req.body.skills !== undefined) {
+    updates.skills = req.body.skills
+  }
+  if (req.body.affiliations !== undefined) {
+    updates.affiliations = req.body.affiliations
+  }
+  if (req.body.fullName !== undefined && updates.full_name === undefined) {
+    updates.full_name = req.body.fullName
+  }
+  if (req.body.email !== undefined) {
+    updates.email = req.body.email
+  }
+  if (req.body.classSection !== undefined) {
+    updates.class_section = req.body.classSection
+  }
+  if (req.body.studentType !== undefined) {
+    updates.student_type = req.body.studentType
+  }
+  if (req.body.studentId !== undefined) {
+    updates.student_id = req.body.studentId
+  }
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid updates provided' })
+  }
+  const user = await store.updateStudentProfile(id, updates)
   res.json({ ok: true, user })
 }))
 
-// eslint-disable-next-line no-unused-vars
+app.get('/api/admin/students', authMiddleware, authorize(PERMISSIONS.MANAGE_USERS), asyncHandler(async (req, res) => {
+  const { skill, affiliation } = req.query
+  let students = []
+  if (skill) {
+    students = await store.findStudentsBySkill(skill)
+  } else if (affiliation) {
+    students = await store.findStudentsByAffiliation(affiliation)
+  } else {
+    // Default to all students
+    const users = await store.listAdminUsers()
+    students = users.filter(u => u.role === 'student')
+  }
+  res.json({ ok: true, students })
+}))
+
 app.use((err, req, res, _next) => {
   // eslint-disable-next-line no-console
   console.error('Unhandled API error:', err)
-  res.status(500).json({ error: 'Internal server error' })
+  res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
 const MAX_PORT_TRIES = 20

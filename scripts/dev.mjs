@@ -1,5 +1,5 @@
+import fs from 'node:fs'
 import { spawn } from 'node:child_process'
-import dotenv from 'dotenv'
 import net from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
@@ -9,12 +9,46 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 
-dotenv.config({ path: path.join(rootDir, '.env') })
+function loadEnvFile() {
+  try {
+    const envPath = path.join(rootDir, '.env')
+    if (!fs.existsSync(envPath)) return
+
+    const raw = fs.readFileSync(envPath, 'utf8')
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = String(line || '').trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+
+      let key, value
+      if (trimmed.startsWith('$env:')) {
+        const m = trimmed.match(/^\$env:(\w+)=(?:"([^"]*)"|'([^']*)'|(.*))$/)
+        if (!m) continue
+        key = m[1]
+        value = m[2] ?? m[3] ?? m[4] ?? ''
+      } else {
+        const idx = trimmed.indexOf('=')
+        if (idx === -1) continue
+        key = trimmed.slice(0, idx).trim()
+        value = trimmed.slice(idx + 1).trim()
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1)
+        }
+      }
+      if (key) {
+        process.env[key] = value
+      }
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Could not load .env file:', err)
+  }
+}
+
+loadEnvFile()
 
 const DEFAULT_PORT = Number(process.env.PORT || 5000)
 const MAX_PORT_PROBES = 20
-// Mongo connect + index creation can exceed a few seconds (especially Atlas cold start).
-const PER_PORT_STARTUP_TIMEOUT_MS = Number(process.env.DEV_BACKEND_TIMEOUT_MS || 45000)
+const PER_PORT_STARTUP_TIMEOUT_MS = 5000
 
 let serverProcess = null
 let viteProcess = null

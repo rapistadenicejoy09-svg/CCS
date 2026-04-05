@@ -379,17 +379,56 @@ body[data-theme='light'] .main-top-bar {
   /* Darker text for white header */
 }
 
+.student-password-reminder {
+  flex-shrink: 0;
+  padding: 12px 32px;
+  background: rgba(229, 118, 47, 0.12);
+  border-bottom: 1px solid rgba(229, 118, 47, 0.35);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+body[data-theme='light'] .student-password-reminder {
+  background: rgba(229, 118, 47, 0.1);
+}
+
+.student-password-reminder-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 960px;
+}
+
+.student-password-reminder-inner strong {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.student-password-reminder-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.student-password-reminder-link:hover {
+  opacity: 0.9;
+}
+
 .top-bar-user-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  text-transform: uppercase;
+  flex-wrap: wrap;
+  text-transform: none;
 }
 
 .top-bar-name {
   font-weight: 700;
   font-size: 14px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .top-bar-id {
@@ -406,6 +445,7 @@ body[data-theme='light'] .main-top-bar {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 body[data-theme='light'] .badge-enrolled {
@@ -589,6 +629,23 @@ body[data-theme='light'] .notif-item.unread {
   line-height: 1.4;
 }
 
+.top-bar-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+.top-bar-avatar .avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  display: block;
+}
+
 .avatar-placeholder {
   width: 32px;
   height: 32px;
@@ -606,6 +663,10 @@ body[data-theme='light'] .avatar-placeholder {
   background: #f3f4f6;
   border-color: #e5e7eb;
   color: #4b5563;
+}
+
+.top-bar-avatar:hover .avatar-img {
+  opacity: 0.92;
 }
 
 .top-bar-avatar:hover .avatar-placeholder {
@@ -698,6 +759,17 @@ body[data-theme='light'] .top-bar-avatar:hover .avatar-placeholder {
   background: #05071a;
 }
 
+/* Force calendar picker icon for date inputs */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block;
+  cursor: pointer;
+  filter: invert(0.8) sepia(100%) saturate(1000%) hue-rotate(330deg); /* Colorize icon to match accent or stay white */
+}
+
+body[data-theme='light'] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
 /* SUMMARY */
 
 .summary-row {
@@ -787,6 +859,31 @@ body[data-theme='light'] .top-bar-avatar:hover .avatar-placeholder {
   overflow: auto;
 }
 
+.student-profile-password-alert {
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(229, 118, 47, 0.4);
+  background: rgba(229, 118, 47, 0.1);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+body[data-theme='light'] .student-profile-password-alert {
+  background: rgba(229, 118, 47, 0.08);
+}
+
+.student-profile-password-alert strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.student-profile-password-alert p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .profile-hero {
   padding: 24px 20px;
   border-radius: 20px;
@@ -837,6 +934,13 @@ body[data-theme='light'] .top-bar-avatar:hover .avatar-placeholder {
 .profile-avatar-faculty {
   background: linear-gradient(135deg, var(--accent), #f0a050);
   color: #1a0d05;
+}
+
+img.profile-avatar.profile-avatar-image {
+  display: block;
+  padding: 0;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
 }
 
 .profile-hero-title {
@@ -1180,11 +1284,13 @@ body[data-theme='light'] .profile-card-icon-faculty {
 
 .btn-primary {
   background: linear-gradient(90deg, #e5762f, #f0a050);
-  color: #1a0d05;
+  color: #ffffff;
   box-shadow: 0 2px 6px rgba(229, 118, 47, 0.25);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
 }
 
 .btn-primary:hover {
+  color: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(229, 118, 47, 0.3);
 }
@@ -1224,6 +1330,29 @@ body[data-theme='light'] .profile-card-icon-faculty {
   border-color: rgba(255, 255, 255, 0.4);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
+}
+
+/* ── CALENDAR PICKER ICON VISIBILITY ── */
+/* Standardize native date picker icon across browsers and themes */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.5); /* Default gray */
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+body[data-theme='light'] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0); /* Black icon on light bg */
+  opacity: 0.5;
+}
+
+input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  filter: sepia(100%) saturate(1000%) hue-rotate(340deg); /* Switch to Orange on hover */
+}
+
+input[type="date"]:focus::-webkit-calendar-picker-indicator {
+  opacity: 1;
 }
 
 /* TABLE */
@@ -1461,6 +1590,23 @@ body[data-theme='light'] .password-toggle:hover {
 .dashboard-page {
   display: flex;
   flex-direction: column;
+}
+
+.dashboard-page--admin .welcome-banner {
+  border-left: 3px solid rgba(59, 130, 246, 0.45);
+}
+
+.dashboard-page--student .welcome-banner,
+.dashboard-page--faculty .welcome-banner {
+  border-left: 3px solid var(--accent);
+}
+
+.dashboard-role-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-grid {
@@ -2133,6 +2279,38 @@ body[data-theme='light'] .nav-item-active {
   color: #f9fafb;
 }
 
+/* SIDEBAR FOOTER DIVIDER */
+.sidebar-footer-divider {
+  height: 1px;
+  width: auto;
+  margin: 12px 16px;
+  background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+  opacity: 0.8;
+}
+
+body[data-theme='light'] .sidebar-footer-divider {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent);
+}
+
+/* LOGOUT NAV ITEM */
+.nav-item-logout {
+  cursor: pointer;
+  margin-top: 8px;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.nav-item-logout:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+body[data-theme='light'] .nav-item-logout:hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #dc2626 !important;
+}
+
 body[data-theme='light'] .footer-list {
   color: #111827;
 }
@@ -2451,4 +2629,184 @@ body[data-theme='light'] .modal-actions {
   border-color: #dc2626 !important;
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
   transform: translateY(-1px);
+}
+
+/* ─── Admin student list & profile (motion) ─── */
+@keyframes adminRevealUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Entrance: no scale on final keyframe so :hover scale is not blocked by fill-forwards */
+@keyframes adminRevealScale {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-animate-reveal {
+  opacity: 0;
+  animation: adminRevealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.admin-student-list-header-enter {
+  opacity: 0;
+  animation: adminRevealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.admin-student-list-toolbar-enter {
+  opacity: 0;
+  animation: adminRevealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.admin-student-list-section-enter {
+  opacity: 0;
+  animation: adminRevealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+}
+
+.admin-student-card-animate {
+  opacity: 0;
+  animation: adminRevealScale 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Grid must not clip scaled / lifted cards */
+.admin-student-card-grid {
+  overflow: visible;
+  padding: 10px;
+  margin: -10px;
+}
+
+.admin-student-card {
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+  transform-origin: center center;
+  transition:
+    transform 0.45s cubic-bezier(0.34, 1.35, 0.64, 1),
+    box-shadow 0.45s ease,
+    border-color 0.28s ease,
+    opacity 0.4s ease,
+    filter 0.4s ease,
+    z-index 0s;
+}
+
+/* Hovered card clearly larger and in front */
+.admin-student-card:hover {
+  z-index: 40;
+  transform: translateY(-14px) scale(1.09);
+  box-shadow:
+    0 28px 56px -12px rgba(0, 0, 0, 0.55),
+    0 0 0 2px rgba(229, 118, 47, 0.45);
+}
+
+body[data-theme='light'] .admin-student-card:hover {
+  box-shadow:
+    0 24px 48px -10px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(229, 118, 47, 0.4);
+}
+
+/* De-emphasize other cards while one is hovered */
+.admin-student-card-grid:has(> .admin-student-card:hover) > .admin-student-card:not(:hover) {
+  transform: scale(0.96);
+  opacity: 0.88;
+  filter: brightness(0.94);
+}
+
+.admin-student-list-row {
+  transition: transform 0.22s ease, background-color 0.22s ease;
+}
+
+.admin-student-list-row:hover {
+  transform: translateX(5px);
+}
+
+.admin-student-table-row-enter {
+  opacity: 0;
+  animation: adminRevealUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--row-enter-delay, 0s);
+}
+
+.admin-delete-modal-content {
+  animation: modalSlideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-profile-card-surface {
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 0.35s ease,
+    border-color 0.25s ease;
+}
+
+.admin-profile-card-surface:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme='light'] .admin-profile-card-surface:hover {
+  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.12);
+}
+
+.admin-profile-block-enter {
+  opacity: 0;
+  animation: adminRevealUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .admin-animate-reveal,
+  .admin-student-list-header-enter,
+  .admin-student-list-toolbar-enter,
+  .admin-student-list-section-enter,
+  .admin-student-card-animate,
+  .admin-profile-block-enter {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .admin-student-card,
+  .admin-student-card:hover {
+    transform: none !important;
+    transition: border-color 0.2s ease !important;
+    filter: none !important;
+    opacity: 1 !important;
+    z-index: auto !important;
+  }
+
+  .admin-student-card-grid:has(> .admin-student-card:hover) > .admin-student-card:not(:hover) {
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+
+  .admin-student-list-row:hover {
+    transform: none !important;
+  }
+
+  .admin-student-table-row-enter {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .admin-profile-card-surface,
+  .admin-profile-card-surface:hover {
+    transform: none !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  }
+
+  .admin-delete-modal-content {
+    animation: none !important;
+  }
 }

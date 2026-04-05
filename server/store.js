@@ -1,1 +1,5 @@
-export { openMongoStore as openStore } from './store-mongo.js'
+import { openMongoStore } from './store-mongo.js'
+
+export async function openStore() {
+  return await openMongoStore()
+}
